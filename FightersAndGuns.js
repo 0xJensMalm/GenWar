@@ -60,22 +60,10 @@ class Gun {
   }
 
   updateTarget(opposingTeam) {
-    // Debugging logs
-    console.log(
-      `Current time: ${millis()}, Next target switch time: ${
-        this.nextTargetSwitchTime
-      }`
-    );
-
     if (opposingTeam.length > 0 && millis() > this.nextTargetSwitchTime) {
       const randomIndex = floor(random(opposingTeam.length));
       this.target = opposingTeam[randomIndex];
       this.nextTargetSwitchTime = millis() + random(500, 3000); // Set the next switch time
-
-      // Debugging log to confirm a new target is assigned
-      console.log(
-        `New target assigned to fighter at (${this.fighter.x}, ${this.fighter.y})`
-      );
     }
   }
 }

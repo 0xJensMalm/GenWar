@@ -68,46 +68,17 @@ function draw() {
 
   // Handle fighting logic
   if (fighting) {
-    // Log only once per draw cycle
-    console.log("Attempting to shoot...");
-
-    // Team A shooting logic with detailed logging
-    teamA.forEach((fighter, index) => {
-      if (fighter.gun) {
-        if (fighter.gun.target) {
-          console.log(
-            `Team A Fighter at (${fighter.x}, ${fighter.y}) shooting at target at (${fighter.gun.target.x}, ${fighter.gun.target.y})`
-          );
-          fighter.gun.shoot(fighter.gun.target);
-        } else {
-          console.log(
-            `Team A Fighter at (${fighter.x}, ${fighter.y}) has no target.`
-          );
-        }
-      } else {
-        console.log(
-          `Team A Fighter at (${fighter.x}, ${fighter.y}) has no gun.`
-        );
+    // Team A shooting logic
+    teamA.forEach((fighter) => {
+      if (fighter.gun && fighter.gun.target) {
+        fighter.gun.shoot(fighter.gun.target);
       }
     });
 
-    // Team B shooting logic with detailed logging
-    teamB.forEach((fighter, index) => {
-      if (fighter.gun) {
-        if (fighter.gun.target) {
-          console.log(
-            `Team B Fighter at (${fighter.x}, ${fighter.y}) shooting at target at (${fighter.gun.target.x}, ${fighter.gun.target.y})`
-          );
-          fighter.gun.shoot(fighter.gun.target);
-        } else {
-          console.log(
-            `Team B Fighter at (${fighter.x}, ${fighter.y}) has no target.`
-          );
-        }
-      } else {
-        console.log(
-          `Team B Fighter at (${fighter.x}, ${fighter.y}) has no gun.`
-        );
+    // Team B shooting logic
+    teamB.forEach((fighter) => {
+      if (fighter.gun && fighter.gun.target) {
+        fighter.gun.shoot(fighter.gun.target);
       }
     });
 
