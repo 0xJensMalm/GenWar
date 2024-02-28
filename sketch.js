@@ -1,51 +1,61 @@
+// Global variables
 let soldiers = [];
 let particles = [];
-let teamSize = 30;
+const teamSize = 30; // Constant for team size
 
-function setup() {
-  createCanvas(800, 600);
+// Blood particle parameters
+let bloodParticleAmount = 30; // Default amount of blood particles
+let bloodParticleSpeedMin = 10; // Minimum speed of blood particles
+let bloodParticleSpeedMax = 40; // Maximum speed of blood particles
+let bloodParticleSizeMin = 1; // Minimum size of blood particles
+let bloodParticleSizeMax = 8; // Maximum size of blood particles
+
+// Draw function to update the canvas each frame
+function draw() {
+  background(100);
+  updateSoldiers();
+  checkWinningCondition();
+  updateParticles();
+}
+
+// Function to initialize soldiers
+function initializeSoldiers() {
   for (let i = 0; i < teamSize * 2; i++) {
-    // Now based on teamSize
-    let team = i % 2 === 0 ? "red" : "blue";
-    let x = team === "red" ? random(width / 2) : random(width / 2, width);
-    let y = random(height);
-    if (random() < 0.5) {
-      soldiers.push(new RangedSoldier(x, y, team));
-    } else {
-      soldiers.push(new MeleeSoldier(x, y, team));
-    }
+    const team = i % 2 === 0 ? "red" : "blue";
+    const x = team === "red" ? random(width / 2) : random(width / 2, width);
+    const y = random(height);
+    const soldierType = random() < 0.5 ? RangedSoldier : MeleeSoldier;
+    soldiers.push(new soldierType(x, y, team));
   }
 }
 
-function draw() {
-  background(100);
-
-  // Update and display soldiers
+// Function to update and display soldiers
+function updateSoldiers() {
   soldiers = soldiers.filter((soldier) => {
     soldier.show();
     soldier.move();
     soldier.attack();
-    return soldier.isActive; // Keep only active soldiers
+    return soldier.isActive;
   });
+}
 
-  // Check for a winning team
-  let activeTeams = new Set(soldiers.map((soldier) => soldier.team));
+// Function to check for a winning team
+function checkWinningCondition() {
+  const activeTeams = new Set(soldiers.map((soldier) => soldier.team));
   if (activeTeams.size === 1) {
-    let winningTeam = [...activeTeams][0]; // Get the winning team
+    const winningTeam = [...activeTeams][0];
     soldiers.forEach((soldier) => {
-      if (soldier.team === winningTeam) {
-        soldier.isWinner = true; // Mark the soldier as part of the winning team
-      }
+      if (soldier.team === winningTeam) soldier.isWinner = true;
     });
   }
+}
 
-  // Update and display particles
+// Function to update and display particles
+function updateParticles() {
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].show();
-    if (particles[i].isDead()) {
-      particles.splice(i, 1); // Remove dead particles
-    }
+    if (particles[i].isDead()) particles.splice(i, 1);
   }
 }
 
@@ -56,11 +66,11 @@ class Soldier {
     this.y = y;
     this.size = 20;
     this.team = team;
-    this.health = 150; // Default health
+    this.health = 150;
     this.speed = 2;
-    this.damage = 10; // Default damage
+    this.damage = 10;
     this.target = null;
-    this.isActive = true; // Flag to check if the soldier is active
+    this.isActive = true;
   }
 
   show() {
@@ -69,42 +79,98 @@ class Soldier {
   }
 
   move() {
-    if (this.isWinner) {
-      // Move towards the nearest edge
-      let edgeDirection = this.x < width / 2 ? -1 : 1;
-      this.x += this.speed * edgeDirection * 5; // Increase speed for exiting
-    } else {
-      // Default random movement
-      this.x += random(-this.speed, this.speed);
-      this.y += random(-this.speed, this.speed);
-    }
+    // Custom move logic for winners
+    if (this.isWinner) this.moveOutOfCanvas();
+    else this.randomMove();
+  }
+
+  randomMove() {
+    this.x += random(-this.speed, this.speed);
+    this.y += random(-this.speed, this.speed);
+  }
+
+  moveOutOfCanvas() {
+    const edgeDirection = this.x < width / 2 ? -1 : 1;
+    this.x += this.speed * edgeDirection * 5;
   }
 
   attack() {
-    // Base attack method to be overridden by subclasses
+    /* Base attack method */
   }
 
   findTarget() {
-    // Method to find a target, can be overridden or extended by subclasses
+    /* Base findTarget method */
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, attacker) {
     this.health -= amount;
-    if (this.health <= 0 && this.isActive) {
-      this.onDeath();
-    }
+    if (this.health <= 0) this.onDeath();
+    else this.generateParticles(attacker);
   }
 
   onDeath() {
+    this.isActive = false;
     console.log(`A ${this.team} soldier has died.`);
-    this.isActive = false; // Mark the soldier as inactive
+    this.generateDeathParticles();
+  }
 
-    // Generate death particles
-    for (let i = 0; i < 20; i++) {
-      // Generate 20 particles per death
-      let teamColor = this.team === "red" ? [255, 0, 0] : [0, 0, 255]; // Color based on team
-      particles.push(new Particle(this.x, this.y, teamColor));
+  generateParticles(attacker) {
+    if (!attacker) return;
+    for (let i = 0; i < bloodParticleAmount; i++) {
+      const angle =
+        atan2(this.y - attacker.y, this.x - attacker.x) +
+        random(-bloodParticleSpread, bloodParticleSpread);
+      const speed = random(bloodParticleSpeedMin, bloodParticleSpeedMax);
+      const velocity = createVector(cos(angle) * speed, sin(angle) * speed);
+      const size = random(bloodParticleSizeMin, bloodParticleSizeMax);
+      const color = [random(100, 255), 0, 0]; // Shades of red
+      particles.push(new Particle(this.x, this.y, color, velocity, size));
     }
+  }
+
+  generateDeathParticles() {
+    for (let i = 0; i < 20; i++) {
+      const teamColor = this.team === "red" ? [255, 0, 0] : [0, 0, 255];
+      particles.push(
+        new Particle(
+          this.x,
+          this.y,
+          teamColor,
+          createVector(random(-1, 1), random(-1, 1))
+        )
+      );
+    }
+  }
+}
+
+// Particle class with added checks
+class Particle {
+  constructor(x, y, color, velocity, size) {
+    this.position = createVector(x, y);
+    this.velocity = velocity;
+    this.size = size; // Use the size parameter
+    this.lifespan = 255;
+    this.color = color;
+    this.isStatic = false;
+  }
+
+  update() {
+    if (!this.isStatic) {
+      this.position.add(this.velocity);
+      this.velocity.mult(0.9);
+      if (this.velocity.mag() < 0.1) this.isStatic = true;
+    }
+    this.lifespan -= 2;
+  }
+
+  show() {
+    noStroke();
+    fill(...this.color, this.lifespan);
+    ellipse(this.position.x, this.position.y, this.size);
+  }
+
+  isDead() {
+    return this.isStatic && this.lifespan < 0;
   }
 }
 
@@ -133,7 +199,8 @@ class RangedSoldier extends Soldier {
     if (this.target) {
       stroke("yellow");
       line(this.x, this.y, this.target.x, this.target.y);
-      this.target.takeDamage(this.damage);
+      this.target.takeDamage(this.damage, this);
+
       // Optionally, reset target after each attack or keep attacking the same target for a while
     }
   }
@@ -165,7 +232,8 @@ class MeleeSoldier extends Soldier {
       this.target &&
       dist(this.x, this.y, this.target.x, this.target.y) <= this.attackRange
     ) {
-      this.target.takeDamage(this.damage);
+      this.target.takeDamage(this.damage, this);
+
       fill("black");
       ellipse(this.x, this.y, this.size * 1.5); // Visual indication of attack
     }
@@ -188,28 +256,9 @@ class MeleeSoldier extends Soldier {
   }
 }
 
-class Particle {
-  constructor(x, y, teamColor) {
-    this.position = createVector(x, y);
-    this.velocity = p5.Vector.random2D(); // Gives a random velocity
-    this.velocity.mult(random(1, 5)); // Randomize the speed
-    this.size = random(3, 6);
-    this.lifespan = 255; // Start fully opaque
-    this.color = teamColor;
-  }
-
-  update() {
-    this.position.add(this.velocity);
-    this.lifespan -= 6; // Decrease to fade out
-  }
-
-  show() {
-    noStroke();
-    fill(this.color[0], this.color[1], this.color[2], this.lifespan); // Use RGBA for fading effect
-    ellipse(this.position.x, this.position.y, this.size);
-  }
-
-  isDead() {
-    return this.lifespan < 0;
-  }
+// Setup function to initialize the canvas and soldiers
+function setup() {
+  createCanvas(800, 600);
+  bloodParticleSpread = PI / 6; // Initialize here, where PI is available
+  initializeSoldiers();
 }
