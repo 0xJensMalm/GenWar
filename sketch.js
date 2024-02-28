@@ -1,137 +1,197 @@
-let teamA = []; // Team on the left
-let teamB = []; // Team on the right
-let fightButton;
-let fighting = false;
-let fightStartTime;
+let soldiers = [];
+let particles = [];
 
 function setup() {
-  createCanvas(800, 600); // Increased canvas size
-
-  // Create Team A fighters on the left side
-  for (let i = 0; i < 5; i++) {
-    let fighter = createRandomFighter(50, (height / 6) * (i + 1));
-    assignRandomGun(fighter);
-    teamA.push(fighter);
+  createCanvas(800, 600);
+  for (let i = 0; i < 20; i++) {
+    let team = i % 2 === 0 ? "red" : "blue";
+    let x = team === "red" ? random(width / 2) : random(width / 2, width);
+    let y = random(height);
+    if (random() < 0.5) {
+      // 50% chance for each type
+      soldiers.push(new RangedSoldier(x, y, team));
+    } else {
+      soldiers.push(new MeleeSoldier(x, y, team));
+    }
   }
-
-  // Create Team B fighters on the right side
-  for (let i = 0; i < 5; i++) {
-    let fighter = createRandomFighter(width - 100, (height / 6) * (i + 1));
-    assignRandomGun(fighter);
-    teamB.push(fighter);
-  }
-
-  // Log Team A composition
-  console.log("Team A:");
-  teamA.forEach((fighter) => {
-    const gunType = fighter.gun ? fighter.gun.constructor.name : "No Gun";
-    console.log(`- Fighter at (${fighter.x}, ${fighter.y}) with ${gunType}`);
-  });
-
-  // Log Team B composition
-  console.log("Team B:");
-  teamB.forEach((fighter) => {
-    const gunType = fighter.gun ? fighter.gun.constructor.name : "No Gun";
-    console.log(`- Fighter at (${fighter.x}, ${fighter.y}) with ${gunType}`);
-  });
-
-  // Create the "fight" button
-  fightButton = createButton("fight");
-  fightButton.position(width / 2 - 30, 20);
-  fightButton.mousePressed(startFight);
 }
 
 function draw() {
   background(100);
 
-  // Draw and update fighters from Team A
-  teamA.forEach((fighter) => {
-    fighter.draw();
-    if (fighter.gun && millis() - fighter.gun.lastTargetUpdateTime > 500) {
-      // Check to update target every 500ms as an example
-      fighter.gun.updateTarget(teamB); // Ensure we're passing the correct opposing team
-      fighter.gun.lastTargetUpdateTime = millis(); // Update the time we last updated the target
-    }
-    updateGun(fighter); // Assuming this function updates the shooting logic
+  // Update and display soldiers
+  soldiers = soldiers.filter((soldier) => {
+    soldier.show();
+    soldier.move();
+    soldier.attack();
+    return soldier.isActive; // Keep only active soldiers
   });
 
-  // Draw and update fighters from Team B
-  teamB.forEach((fighter) => {
-    fighter.draw();
-    if (fighter.gun && millis() - fighter.gun.lastTargetUpdateTime > 500) {
-      // Check to update target every 500ms as an example
-      fighter.gun.updateTarget(teamA); // Here's the correction, passing teamA as the opposing team
-      fighter.gun.lastTargetUpdateTime = millis(); // Update the time we last updated the target
-    }
-    updateGun(fighter); // Assuming this function updates the shooting logic
-  });
-
-  // Handle fighting logic
-  if (fighting) {
-    // Team A shooting logic
-    teamA.forEach((fighter) => {
-      if (fighter.gun && fighter.gun.target) {
-        fighter.gun.shoot(fighter.gun.target);
-      }
-    });
-
-    // Team B shooting logic
-    teamB.forEach((fighter) => {
-      if (fighter.gun && fighter.gun.target) {
-        fighter.gun.shoot(fighter.gun.target);
-      }
-    });
-
-    // Stop fighting after 10 seconds
-    if (millis() - fightStartTime > 10000) {
-      fighting = false;
+  // Update and display particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].show();
+    if (particles[i].isDead()) {
+      particles.splice(i, 1); // Remove dead particles
     }
   }
 }
 
-function startFight() {
-  if (!fighting) {
-    fighting = true;
-    fightStartTime = millis();
+// Base Soldier class
+class Soldier {
+  constructor(x, y, team) {
+    this.x = x;
+    this.y = y;
+    this.size = 20;
+    this.team = team;
+    this.health = 150; // Default health
+    this.speed = 2;
+    this.damage = 10; // Default damage
+    this.target = null;
+    this.isActive = true; // Flag to check if the soldier is active
+  }
+
+  show() {
+    fill(this.team === "red" ? "red" : "blue");
+    ellipse(this.x, this.y, this.size);
+  }
+
+  move() {
+    // Default random movement
+    this.x += random(-this.speed, this.speed);
+    this.y += random(-this.speed, this.speed);
+  }
+
+  attack() {
+    // Base attack method to be overridden by subclasses
+  }
+
+  findTarget() {
+    // Method to find a target, can be overridden or extended by subclasses
+  }
+
+  takeDamage(amount) {
+    this.health -= amount;
+    if (this.health <= 0 && this.isActive) {
+      this.onDeath();
+    }
+  }
+
+  onDeath() {
+    console.log(`A ${this.team} soldier has died.`);
+    this.isActive = false; // Mark the soldier as inactive
+
+    // Generate death particles
+    for (let i = 0; i < 20; i++) {
+      // Generate 20 particles per death
+      let teamColor = this.team === "red" ? [255, 0, 0] : [0, 0, 255]; // Color based on team
+      particles.push(new Particle(this.x, this.y, teamColor));
+    }
   }
 }
 
-function createRandomFighter(x, y) {
-  let fighterType = floor(random(3));
-  switch (fighterType) {
-    case 0:
-      return new BlueFighter(x, y);
-    case 1:
-      return new GreenFighter(x, y);
-    case 2:
-      return new RedFighter(x, y);
+class RangedSoldier extends Soldier {
+  constructor(x, y, team) {
+    super(x, y, team);
+    this.damage = 15; // Specific damage for ranged
+    this.lastAttackTime = 0; // Initialize last attack time
+    this.attackInterval = random(2000, 5000); // Random interval between attacks
+  }
+
+  findTarget() {
+    // Find a random target every few seconds, not necessarily the closest
+    if (millis() - this.lastAttackTime > this.attackInterval) {
+      this.target = random(
+        soldiers.filter(
+          (soldier) => soldier.team !== this.team && soldier.health > 0
+        )
+      );
+      this.lastAttackTime = millis(); // Update the last attack time
+    }
+  }
+
+  attack() {
+    this.findTarget();
+    if (this.target) {
+      stroke("yellow");
+      line(this.x, this.y, this.target.x, this.target.y);
+      this.target.takeDamage(this.damage);
+      // Optionally, reset target after each attack or keep attacking the same target for a while
+    }
   }
 }
 
-function assignRandomGun(fighter) {
-  if (random() < 0.5) {
-    fighter.gun = new LaserGun(fighter);
-  } else {
-    fighter.gun = new AutoRifle(fighter);
+// MeleeSoldier class
+class MeleeSoldier extends Soldier {
+  constructor(x, y, team) {
+    super(x, y, team);
+    this.health = 250; // Higher health for melee
+    this.damage = 25; // Higher damage for melee
+    this.attackRange = 25;
+  }
+
+  move() {
+    this.findTarget(); // Ensure a target is always being sought
+    if (this.target) {
+      let angle = atan2(this.target.y - this.y, this.target.x - this.x);
+      this.x += this.speed * cos(angle);
+      this.y += this.speed * sin(angle);
+    }
+    this.x = constrain(this.x, 0, width); // Keep within canvas bounds
+    this.y = constrain(this.y, 0, height);
+  }
+
+  attack() {
+    this.findTarget(); // Ensure a target is available before attacking
+    if (
+      this.target &&
+      dist(this.x, this.y, this.target.x, this.target.y) <= this.attackRange
+    ) {
+      this.target.takeDamage(this.damage);
+      fill("black");
+      ellipse(this.x, this.y, this.size * 1.5); // Visual indication of attack
+    }
+  }
+
+  findTarget() {
+    // Updated targeting logic to ensure continuous engagement
+    let closest = null;
+    let recordDistance = Infinity;
+    soldiers.forEach((soldier) => {
+      if (soldier.team !== this.team && soldier.health > 0) {
+        let d = dist(this.x, this.y, soldier.x, soldier.y);
+        if (d < recordDistance) {
+          recordDistance = d;
+          closest = soldier;
+        }
+      }
+    });
+    this.target = closest;
   }
 }
 
-function updateGun(fighter) {
-  if (fighter.gun instanceof AutoRifle) {
-    fighter.gun.updatePixels();
+class Particle {
+  constructor(x, y, teamColor) {
+    this.position = createVector(x, y);
+    this.velocity = p5.Vector.random2D(); // Gives a random velocity
+    this.velocity.mult(random(1, 5)); // Randomize the speed
+    this.size = random(3, 6);
+    this.lifespan = 255; // Start fully opaque
+    this.color = teamColor;
+  }
+
+  update() {
+    this.position.add(this.velocity);
+    this.lifespan -= 6; // Decrease to fade out
+  }
+
+  show() {
+    noStroke();
+    fill(this.color[0], this.color[1], this.color[2], this.lifespan); // Use RGBA for fading effect
+    ellipse(this.position.x, this.position.y, this.size);
+  }
+
+  isDead() {
+    return this.lifespan < 0;
   }
 }
-
-// Log Team A
-console.log("Team A:");
-teamA.forEach((fighter) => {
-  const gunType = fighter.gun ? fighter.gun.constructor.name : "No Gun";
-  console.log(`- Fighter at (${fighter.x}, ${fighter.y}) with ${gunType}`);
-});
-
-// Log Team B
-console.log("Team B:");
-teamB.forEach((fighter) => {
-  const gunType = fighter.gun ? fighter.gun.constructor.name : "No Gun";
-  console.log(`- Fighter at (${fighter.x}, ${fighter.y}) with ${gunType}`);
-});
