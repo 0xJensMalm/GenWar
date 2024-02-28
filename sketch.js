@@ -1,14 +1,15 @@
 let soldiers = [];
 let particles = [];
+let teamSize = 30;
 
 function setup() {
   createCanvas(800, 600);
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < teamSize * 2; i++) {
+    // Now based on teamSize
     let team = i % 2 === 0 ? "red" : "blue";
     let x = team === "red" ? random(width / 2) : random(width / 2, width);
     let y = random(height);
     if (random() < 0.5) {
-      // 50% chance for each type
       soldiers.push(new RangedSoldier(x, y, team));
     } else {
       soldiers.push(new MeleeSoldier(x, y, team));
@@ -26,6 +27,17 @@ function draw() {
     soldier.attack();
     return soldier.isActive; // Keep only active soldiers
   });
+
+  // Check for a winning team
+  let activeTeams = new Set(soldiers.map((soldier) => soldier.team));
+  if (activeTeams.size === 1) {
+    let winningTeam = [...activeTeams][0]; // Get the winning team
+    soldiers.forEach((soldier) => {
+      if (soldier.team === winningTeam) {
+        soldier.isWinner = true; // Mark the soldier as part of the winning team
+      }
+    });
+  }
 
   // Update and display particles
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -57,9 +69,15 @@ class Soldier {
   }
 
   move() {
-    // Default random movement
-    this.x += random(-this.speed, this.speed);
-    this.y += random(-this.speed, this.speed);
+    if (this.isWinner) {
+      // Move towards the nearest edge
+      let edgeDirection = this.x < width / 2 ? -1 : 1;
+      this.x += this.speed * edgeDirection * 5; // Increase speed for exiting
+    } else {
+      // Default random movement
+      this.x += random(-this.speed, this.speed);
+      this.y += random(-this.speed, this.speed);
+    }
   }
 
   attack() {
